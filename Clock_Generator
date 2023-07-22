@@ -1,0 +1,70 @@
+module clk_generation
+  (
+    input clk,rst,
+    input [16:0] baud,   //Size of baud signal
+    output tx_clk,
+  );
+  
+  //will have two counter keeps track of signal Count and clock Tick
+  reg t_clk=0;
+  int tx_max=0;
+  int tx_count=0;
+  
+  //Taking generator frequency as 50MHZ and
+  //and calculations are based in that
+  always@(posedge clk)
+    begin
+      if(rst)
+        begin
+          tx_max <= 0;
+        end
+      else begin
+        case(baud)
+          4800:begin
+            tx_max <= 14'd10146;
+          end
+          9600:begin
+            tx_max<= 4'd5208;
+          end
+          14400: begin
+            tx_max<= 14'd3472;
+          end
+          19200: begin
+            tx_max<= 14'd2604;
+          end
+          38400: begin
+            tx_max<= 14'd1302;
+          end
+          default: begin
+            tx_max <=14'd 5208;  //So default baud rate is set ot 9600
+          end
+        endcase
+      end
+    end
+  
+  always@(posedge clk)
+    begin
+      if(rst)
+        begin
+          tx_count<=0;
+          t_clk<=0;
+        end
+      else begin
+        if(tx_count < tx_max/2) begin
+          tx_count <= tx_count+1;
+        end
+        else begin
+          t_clk <= ~t_clk;
+          tx_count<=0;
+        end
+      end
+    end
+  assign tx_clk= t_clk;
+  
+  initial begin
+    $dumfile("dump.vcd");
+    $dumpvars;
+    $finish();
+  end
+endmodule
+          
