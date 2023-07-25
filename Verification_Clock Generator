@@ -20,3 +20,95 @@ class transaction extends uvm_sequence_item;
   endfunction
 endclass
 /////////////////////////
+//declaring this class as um_sequence and by doing this uvm_sequence#(transaction) 
+//It means transaction is passed as parameter to UVM_SEQUENCE
+class resetn extends uvm_sequence#(transaction);
+  `uvm_object_utils(resetn)
+  //registering class as object class
+  
+  transaction tr;
+  
+  function new(string name="resetn");
+    //initializing new object objext for the object rstn
+    super.new(name);
+  endfunction
+  
+  virtual task body();
+    repeat(5)
+      begin
+       //This line creates a new transaction object and assigns it to the variable tr. The  				          //transaction::type_id::create() function is used to create a new object of the transaction class. The          //"tr" parameter is the name of the new object.
+        tr=transaction::type_id::create("tr");
+        //starting new item in the sequence
+        start_item(tr);
+        assert(tr.randomize);
+        tr.operation_mode= rst_assert;
+        finish_item(tr);
+      end
+  endtask
+endclass
+///////////////////////////////////////
+class Baud_rate extends uvm_sequence#(transaction);
+  `uvm_object_utils(Baud_rate)
+  transaction tr;
+  
+  function new(string name="Baud_rate");
+    super.new(name);
+  endfunction
+  
+  // The body() task is declared as a virtual task because it is intended to be overridden by derived classes. 	 //For example, a derived class might override the body() task to create a different type of transaction or to   //perform different operations on the transaction
+  virtual task body();
+    repeat(5)
+      begin
+        tr=transaction::type_id::create("tr");
+        start_item(tr);
+        assert(tr.randomize);
+        tr.operation_mode= baud;
+        finish.item(tr);
+      end
+  endtask
+endclass
+//////////////////////////////////////
+
+class driver extends uvm_driver#(transaction);
+  //registering class with uvm_component purpose of registering class with uvm_component is definifg that we 
+  //need static component means it will stay for entire simulation.
+  `uvm_component_utils(driver)
+  
+  transaction tr;
+  virtual clk_if cif;
+  
+  function new(input string path="drv",uvm_component parent=null);
+    super.new(path,parent);
+  endfunction
+  
+  virtual function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    tr=transaction::type_id::create("tr");
+    if(!uvm_config_db#(virtual clk_if)::get(this,"","cif",cif)) 
+      `uvm_error("drv","Unable to access Interface");
+  endfunction
+  
+  virtual task run_phase(uvm_phase phase);
+    forever begin
+      seq_item_port.get_next_item(tr);
+      
+      if(tr.operation_mode == rst_assert)
+           begin
+              cif.rst <= 1'b1;
+             @(posedge cif.clk);
+           end
+      else if (tr.operation_mode == baud )
+           begin
+             `uvm_info("DRV",$sformatf("Baud : %0d",tr.baud), UVM_NONE);
+             cif.rst  <= 1'b0;
+             cif.baud <= tr.baud;
+             @(posedge cif.clk);
+             @(posedge cif.tx_clk);
+             @(posedge cif.tx_clk);
+           end
+  
+      seq_item_port.item_done();
+    end
+  endtask
+  
+endclass
